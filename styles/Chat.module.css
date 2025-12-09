@@ -4,27 +4,170 @@
   height: 100vh;
   max-width: 100%;
   margin: 0 auto;
-  background: #1a1a1a;
+  background: linear-gradient(180deg, #0f2027 0%, #203a43 50%, #2c5364 100%);
   color: #fff;
+  position: relative;
+  padding-top: 2.5rem;
+}
+
+/* Christmas lights decoration */
+.container::before {
+  content: '🔴 🟡 🔵 🟢 🔴 🟡 🔵';
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  font-size: 1.2rem;
+  padding: 0.25rem;
+  text-align: center;
+  background: linear-gradient(180deg, rgba(0,0,0,0.5) 0%, transparent 100%);
+  z-index: 1000;
+  pointer-events: none;
+  animation: twinkle 2s ease-in-out infinite;
+  overflow: hidden;
+}
+
+@keyframes twinkle {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+@media (min-width: 768px) {
+  .container::before {
+    content: '🔴 🟡 🔵 🟢 🔴 🟡 🔵 🟢 🔴 🟡 🔵 🟢 🔴 🟡 🔵 🟢';
+    font-size: 1.5rem;
+    padding: 0.5rem;
+  }
+  
+  .container {
+    padding-top: 3rem;
+  }
 }
 
 .header {
   padding: 1rem;
-  background: #2a2a2a;
-  border-bottom: 1px solid #3a3a3a;
+  background: linear-gradient(135deg, #165b33 0%, #1e4d2b 100%);
+  border-bottom: 2px solid #d4af37;
   display: flex;
   justify-content: space-between;
   align-items: center;
+  box-shadow: 0 2px 8px rgba(212, 175, 55, 0.2);
+  position: relative;
+  z-index: 2;
+}
+
+@keyframes swing {
+  0%, 100% { transform: rotate(-5deg); }
+  50% { transform: rotate(5deg); }
 }
 
 .headerTitle {
   font-size: 1.2rem;
   font-weight: 600;
+  color: #ffd700;
+  text-shadow: 0 0 10px rgba(255, 215, 0, 0.3);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.headerTitle::before {
+  content: '🎅';
+  animation: wave 2s ease-in-out infinite;
+  font-size: 1.5rem;
+}
+
+@keyframes wave {
+  0%, 100% { transform: rotate(0deg); }
+  25% { transform: rotate(-10deg); }
+  75% { transform: rotate(10deg); }
 }
 
 .userInfo {
   font-size: 0.875rem;
-  color: #aaa;
+  color: #e8f5e9;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.userListButton {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid #d4af37;
+  color: #ffd700;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.875rem;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  transition: all 0.2s;
+}
+
+.userListButton:hover {
+  background: rgba(255, 215, 0, 0.2);
+  border-color: #ffd700;
+}
+
+.userListPanel {
+  background: linear-gradient(135deg, #1a4731 0%, #1e3a2b 100%);
+  border-bottom: 2px solid #d4af37;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.userListHeader {
+  padding: 0.75rem 1rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid rgba(212, 175, 55, 0.3);
+  font-weight: 600;
+  font-size: 0.875rem;
+  color: #ffd700;
+}
+
+.userListClose {
+  background: none;
+  border: none;
+  color: #888;
+  cursor: pointer;
+  font-size: 1.5rem;
+  padding: 0;
+  line-height: 1;
+  transition: color 0.2s;
+}
+
+.userListClose:hover {
+  color: #fff;
+}
+
+.userListContent {
+  padding: 0.5rem 0;
+}
+
+.userListItem {
+  padding: 0.5rem 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+}
+
+.onlineDot {
+  width: 8px;
+  height: 8px;
+  background: #dc2626;
+  border-radius: 50%;
+  flex-shrink: 0;
+  box-shadow: 0 0 8px rgba(220, 38, 38, 0.6);
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { box-shadow: 0 0 8px rgba(220, 38, 38, 0.6); }
+  50% { box-shadow: 0 0 12px rgba(220, 38, 38, 1); }
 }
 
 .errorBanner {
@@ -60,15 +203,18 @@
 
 .threadsPanel {
   width: 100%;
-  background: #2a2a2a;
-  border-right: 1px solid #3a3a3a;
+  background: linear-gradient(180deg, #1a4731 0%, #1e3a2b 100%);
+  border-right: 2px solid #d4af37;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
+  position: relative;
 }
 
 .chatPanel {
   display: none;
+  height: 100%;
+  overflow: hidden;
 }
 
 .threadsPanelHidden {
@@ -79,6 +225,7 @@
   display: flex;
   flex-direction: column;
   width: 100%;
+  height: 100%;
 }
 
 .threadsList {
@@ -88,21 +235,23 @@
 
 .threadItem {
   padding: 1rem;
-  border-bottom: 1px solid #3a3a3a;
+  border-bottom: 1px solid rgba(212, 175, 55, 0.2);
   cursor: pointer;
-  transition: background 0.2s;
+  transition: all 0.2s;
   display: flex;
   align-items: center;
   gap: 0.5rem;
 }
 
 .threadItem:hover {
-  background: #333;
+  background: rgba(255, 215, 0, 0.1);
+  border-left: 3px solid #ffd700;
 }
 
 .threadItemActive {
-  background: #404040;
-  border-left: 3px solid #0070f3;
+  background: linear-gradient(90deg, rgba(212, 175, 55, 0.2) 0%, rgba(220, 38, 38, 0.1) 100%);
+  border-left: 3px solid #dc2626;
+  box-shadow: inset 0 0 10px rgba(220, 38, 38, 0.1);
 }
 
 .threadName {
@@ -113,7 +262,7 @@
 .deleteThreadButton {
   background: none;
   border: none;
-  color: #ff4444;
+  color: #ff6b6b;
   cursor: pointer;
   font-size: 1.5rem;
   padding: 0.25rem 0.5rem;
@@ -125,42 +274,70 @@
 
 .deleteThreadButton:hover {
   opacity: 1;
+  color: #ff5252;
 }
 
 .adminControls {
   padding: 1rem;
-  border-top: 1px solid #3a3a3a;
+  border-top: 2px solid #d4af37;
+  background: rgba(22, 91, 51, 0.5);
 }
 
-.adminButton {
+.primaryButton {
   width: 100%;
-  padding: 0.75rem;
-  background: #0070f3;
-  color: white;
+  padding: 0.75rem 1.5rem;
+  background: linear-gradient(135deg, #dc2626 0%, #991b1b 100%);
+  color: #fff;
   border: none;
   border-radius: 4px;
   cursor: pointer;
   font-size: 0.875rem;
-  font-weight: 500;
+  font-weight: 600;
+  transition: all 0.2s;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  position: relative;
+  overflow: hidden;
+  white-space: nowrap;
 }
 
-.adminButton:hover {
-  background: #0051cc;
+.primaryButton::before {
+  content: '✨';
+  position: absolute;
+  left: 0.5rem;
+}
+
+.primaryButton:hover {
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(220, 38, 38, 0.4);
+}
+
+.primaryButton:disabled {
+  background: #555;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.adminButton {
+  width: 100%;
 }
 
 .adminButtonSecondary {
-  background: #2a2a2a;
-  border: 1px solid #0070f3;
+  background: rgba(212, 175, 55, 0.2);
+  border: 1px solid #d4af37;
+  color: #ffd700;
 }
 
 .adminButtonSecondary:hover {
-  background: #333;
+  background: rgba(255, 215, 0, 0.3);
+  transform: translateY(-1px);
 }
 
 .chatHeader {
   padding: 1rem;
-  background: #2a2a2a;
-  border-bottom: 1px solid #3a3a3a;
+  background: linear-gradient(135deg, #165b33 0%, #1e4d2b 100%);
+  border-bottom: 2px solid #d4af37;
   display: flex;
   align-items: center;
   gap: 1rem;
@@ -169,17 +346,23 @@
 .backButton {
   background: none;
   border: none;
-  color: #0070f3;
+  color: #ffd700;
   cursor: pointer;
   font-size: 1.5rem;
   padding: 0;
   display: flex;
   align-items: center;
+  transition: transform 0.2s;
+}
+
+.backButton:hover {
+  transform: translateX(-3px);
 }
 
 .chatHeaderTitle {
   font-weight: 600;
   font-size: 1.1rem;
+  color: #ffd700;
 }
 
 .messagesContainer {
@@ -205,7 +388,7 @@
 
 .messageUsername {
   font-weight: 600;
-  color: #0070f3;
+  color: #ffd700;
   font-size: 0.875rem;
 }
 
@@ -238,7 +421,7 @@
 .typingDots span {
   width: 6px;
   height: 6px;
-  background: #0070f3;
+  background: #ffd700;
   border-radius: 50%;
   animation: typingBounce 1.4s infinite ease-in-out;
 }
@@ -270,8 +453,11 @@
 
 .messageInput {
   padding: 1rem;
-  background: #2a2a2a;
-  border-top: 1px solid #3a3a3a;
+  background: linear-gradient(135deg, #1a4731 0%, #1e3a2b 100%);
+  border-top: 2px solid #d4af37;
+  position: sticky;
+  bottom: 0;
+  z-index: 10;
 }
 
 .messageForm {
@@ -283,8 +469,8 @@
   flex: 1;
   padding: 0.75rem;
   padding-bottom: 1.75rem;
-  background: #1a1a1a;
-  border: 1px solid #3a3a3a;
+  background: rgba(15, 32, 39, 0.6);
+  border: 1px solid rgba(212, 175, 55, 0.3);
   border-radius: 4px;
   color: #fff;
   font-family: inherit;
@@ -297,7 +483,8 @@
 
 .messageTextarea:focus {
   outline: none;
-  border-color: #0070f3;
+  border-color: #d4af37;
+  box-shadow: 0 0 10px rgba(212, 175, 55, 0.2);
 }
 
 .characterCount {
@@ -310,23 +497,9 @@
 }
 
 .sendButton {
+  width: auto;
   padding: 0.75rem 1.5rem;
-  background: #0070f3;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  font-weight: 500;
   white-space: nowrap;
-}
-
-.sendButton:hover {
-  background: #0051cc;
-}
-
-.sendButton:disabled {
-  background: #555;
-  cursor: not-allowed;
 }
 
 .modal {
@@ -445,8 +618,8 @@
 .spinner {
   width: 40px;
   height: 40px;
-  border: 3px solid #3a3a3a;
-  border-top-color: #0070f3;
+  border: 3px solid rgba(212, 175, 55, 0.2);
+  border-top-color: #ffd700;
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }

@@ -21,8 +21,11 @@ export default function Chat() {
   const [error, setError] = useState<string>('');
   const [initializingThreads, setInitializingThreads] = useState(false);
   const [typingUsers, setTypingUsers] = useState<{ [key: string]: string[] }>({});
+  const [onlineUsers, setOnlineUsers] = useState<string[]>([]);
+  const [showUserList, setShowUserList] = useState(false);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const typingChannelRef = useRef<any>(null);
+  const presenceChannelRef = useRef<any>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const MAX_MESSAGE_LENGTH = 1000; // About 150-200 words
@@ -59,6 +62,30 @@ export default function Chat() {
     // Load threads
     loadThreads();
 
+    // Setup presence (online users)
+    const presenceChannel = supabase.channel('online-users');
+    
+    presenceChannel
+      .on('presence', { event: 'sync' }, () => {
+        const state = presenceChannel.presenceState();
+        const users = Object.values(state)
+          .flat()
+          .map((presence: any) => presence.username)
+          .filter((name, index, self) => self.indexOf(name) === index); // Remove duplicates
+        setOnlineUsers(users);
+      })
+      .subscribe(async (status) => {
+        if (status === 'SUBSCRIBED') {
+          await presenceChannel.track({
+            userId: storedUserId,
+            username: storedUsername,
+            online_at: new Date().toISOString(),
+          });
+        }
+      });
+
+    presenceChannelRef.current = presenceChannel;
+
     // Subscribe to thread changes
     const threadsSubscription = supabase
       .channel('threads')
@@ -69,6 +96,9 @@ export default function Chat() {
 
     return () => {
       threadsSubscription.unsubscribe();
+      if (presenceChannelRef.current) {
+        presenceChannelRef.current.unsubscribe();
+      }
     };
   }, [router]);
 
@@ -365,6 +395,13 @@ export default function Chat() {
       <div className={styles.header}>
         <div className={styles.headerTitle}>🎄 Carols Chat</div>
         <div className={styles.userInfo}>
+          <button 
+            onClick={() => setShowUserList(!showUserList)} 
+            className={styles.userListButton}
+            title="View online users"
+          >
+            👥 {onlineUsers.length}
+          </button>
           {username} {isAdmin && '(Admin)'} • <button onClick={handleLogout} style={{ background: 'none', border: 'none', color: '#0070f3', cursor: 'pointer' }}>Logout</button>
         </div>
       </div>
@@ -373,6 +410,23 @@ export default function Chat() {
         <div className={styles.errorBanner}>
           {error}
           <button onClick={() => setError('')} className={styles.errorClose}>×</button>
+        </div>
+      )}
+
+      {showUserList && (
+        <div className={styles.userListPanel}>
+          <div className={styles.userListHeader}>
+            <span>Online Users ({onlineUsers.length})</span>
+            <button onClick={() => setShowUserList(false)} className={styles.userListClose}>×</button>
+          </div>
+          <div className={styles.userListContent}>
+            {onlineUsers.map((user) => (
+              <div key={user} className={styles.userListItem}>
+                <span className={styles.onlineDot}></span>
+                {user}
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
@@ -421,12 +475,12 @@ export default function Chat() {
 
           {isAdmin && (
             <div className={styles.adminControls}>
-              <button className={styles.adminButton} onClick={() => setShowCreateThread(true)}>
+              <button className={`${styles.primaryButton} ${styles.adminButton}`} onClick={() => setShowCreateThread(true)}>
                 + Create Thread
               </button>
               {threads.length === 0 && (
                 <button 
-                  className={`${styles.adminButton} ${styles.adminButtonSecondary}`} 
+                  className={`${styles.primaryButton} ${styles.adminButton} ${styles.adminButtonSecondary}`} 
                   onClick={initializeDefaultThreads}
                   disabled={initializingThreads}
                   style={{ marginTop: '0.5rem' }}
@@ -520,7 +574,7 @@ export default function Chat() {
                       {messageInput.length}/{MAX_MESSAGE_LENGTH}
                     </div>
                   </div>
-                  <button type="submit" className={styles.sendButton} disabled={!messageInput.trim()}>
+                  <button type="submit" className={`${styles.primaryButton} ${styles.sendButton}`} disabled={!messageInput.trim()}>
                     Send
                   </button>
                 </form>
