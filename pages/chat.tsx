@@ -23,6 +23,9 @@ export default function Chat() {
   const [typingUsers, setTypingUsers] = useState<{ [key: string]: string[] }>({});
   const [onlineUsers, setOnlineUsers] = useState<string[]>([]);
   const [showUserList, setShowUserList] = useState(false);
+  const [showEditUsername, setShowEditUsername] = useState(false);
+  const [newUsername, setNewUsername] = useState('');
+  const [unreadCounts, setUnreadCounts] = useState<{ [threadId: string]: number }>({});
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const typingChannelRef = useRef<any>(null);
   const presenceChannelRef = useRef<any>(null);
@@ -94,8 +97,24 @@ export default function Chat() {
       })
       .subscribe();
 
+    // Subscribe to all messages for unread count updates
+    const allMessagesSubscription = supabase
+      .channel('all-messages')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, (payload) => {
+        const newMessage = payload.new as any;
+        // If message is in a non-selected thread and from another user, increment unread
+        if (newMessage.thread_id !== selectedThread?.id && newMessage.user_id !== storedUserId) {
+          setUnreadCounts(prev => ({
+            ...prev,
+            [newMessage.thread_id]: (prev[newMessage.thread_id] || 0) + 1
+          }));
+        }
+      })
+      .subscribe();
+
     return () => {
       threadsSubscription.unsubscribe();
+      allMessagesSubscription.unsubscribe();
       if (presenceChannelRef.current) {
         presenceChannelRef.current.unsubscribe();
       }
@@ -122,6 +141,10 @@ export default function Chat() {
         (payload) => {
           const newMessage = payload.new as Message;
           loadMessages(selectedThread.id); // Reload to get user info
+          // If message is from another user, it's unread until we mark as viewed
+          if (newMessage.user_id !== userId) {
+            setUnreadCounts(prev => ({ ...prev, [selectedThread.id]: (prev[selectedThread.id] || 0) + 1 }));
+          }
         }
       )
       .subscribe();
@@ -182,6 +205,15 @@ export default function Chat() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
+  useEffect(() => {
+    // Scroll to bottom when thread is selected (after a short delay to ensure content is rendered)
+    if (selectedThread) {
+      setTimeout(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
+      }, 100);
+    }
+  }, [selectedThread]);
+
   const loadThreads = async () => {
     setLoadingThreads(true);
     setError('');
@@ -204,6 +236,48 @@ export default function Chat() {
     if (data && data.length > 0 && !selectedThread) {
       setSelectedThread(data[0]);
     }
+    
+    // Load unread counts for all threads
+    if (data && data.length > 0) {
+      loadUnreadCounts(data.map(t => t.id));
+    }
+  };
+
+  const loadUnreadCounts = async (threadIds: string[]) => {
+    if (!userId) return;
+
+    const counts: { [threadId: string]: number } = {};
+
+    for (const threadId of threadIds) {
+      // Get last viewed time for this thread
+      const { data: viewData } = await supabase
+        .from('thread_views')
+        .select('last_viewed_at')
+        .eq('user_id', userId)
+        .eq('thread_id', threadId)
+        .single();
+
+      if (viewData?.last_viewed_at) {
+        // Count messages after last viewed time
+        const { count } = await supabase
+          .from('messages')
+          .select('*', { count: 'exact', head: true })
+          .eq('thread_id', threadId)
+          .gt('created_at', viewData.last_viewed_at);
+
+        counts[threadId] = count || 0;
+      } else {
+        // Never viewed - count all messages
+        const { count } = await supabase
+          .from('messages')
+          .select('*', { count: 'exact', head: true })
+          .eq('thread_id', threadId);
+
+        counts[threadId] = count || 0;
+      }
+    }
+
+    setUnreadCounts(counts);
   };
 
   const loadMessages = async (threadId: string) => {
@@ -345,6 +419,22 @@ export default function Chat() {
   const selectThread = (thread: Thread) => {
     setSelectedThread(thread);
     setShowMobileChat(true);
+    markThreadAsViewed(thread.id);
+  };
+
+  const markThreadAsViewed = async (threadId: string) => {
+    if (!userId) return;
+
+    // Upsert thread view record
+    await supabase
+      .from('thread_views')
+      .upsert(
+        { user_id: userId, thread_id: threadId, last_viewed_at: new Date().toISOString() },
+        { onConflict: 'user_id,thread_id' }
+      );
+
+    // Clear unread count for this thread
+    setUnreadCounts(prev => ({ ...prev, [threadId]: 0 }));
   };
 
   const backToThreads = () => {
@@ -356,6 +446,46 @@ export default function Chat() {
     localStorage.removeItem('username');
     localStorage.removeItem('isAdmin');
     router.push('/');
+  };
+
+  const handleEditUsername = async () => {
+    if (!newUsername.trim() || newUsername.trim().length < 2) {
+      alert('Username must be at least 2 characters');
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/users/update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, newUsername: newUsername.trim() }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        alert(data.error || 'Failed to update username');
+        return;
+      }
+
+      // Update local state and storage
+      setUsername(data.username);
+      localStorage.setItem('username', data.username);
+      
+      // Update presence with new username
+      if (presenceChannelRef.current) {
+        await presenceChannelRef.current.track({
+          userId: userId,
+          username: data.username,
+          online_at: new Date().toISOString(),
+        });
+      }
+
+      setShowEditUsername(false);
+      setNewUsername('');
+    } catch (err) {
+      alert('Failed to update username. Please try again.');
+    }
   };
 
   const formatTime = (timestamp: string) => {
@@ -402,7 +532,14 @@ export default function Chat() {
           >
             👥 {onlineUsers.length}
           </button>
-          {username} {isAdmin && '(Admin)'} • <button onClick={handleLogout} style={{ background: 'none', border: 'none', color: '#0070f3', cursor: 'pointer' }}>Logout</button>
+          {username} {isAdmin && '(Admin)'} • 
+          <button onClick={() => {
+            setNewUsername(username);
+            setShowEditUsername(true);
+          }} style={{ background: 'none', border: 'none', color: '#ffd700', cursor: 'pointer', textDecoration: 'underline' }}>
+            Edit
+          </button> • 
+          <button onClick={handleLogout} style={{ background: 'none', border: 'none', color: '#0070f3', cursor: 'pointer' }}>Logout</button>
         </div>
       </div>
 
@@ -454,7 +591,12 @@ export default function Chat() {
                   className={`${styles.threadItem} ${selectedThread?.id === thread.id ? styles.threadItemActive : ''}`}
                 >
                   <div onClick={() => selectThread(thread)} style={{ flex: 1, cursor: 'pointer' }}>
-                    <div className={styles.threadName}>{thread.name}</div>
+                    <div className={styles.threadName}>
+                      {thread.name}
+                      {unreadCounts[thread.id] > 0 && (
+                        <span className={styles.unreadBadge}>{unreadCounts[thread.id]}</span>
+                      )}
+                    </div>
                   </div>
                   {isAdmin && (
                     <button
@@ -563,6 +705,12 @@ export default function Chat() {
                       className={styles.messageTextarea}
                       rows={1}
                       maxLength={MAX_MESSAGE_LENGTH}
+                      onFocus={(e) => {
+                        // Scroll textarea into view when focused (for mobile keyboard)
+                        setTimeout(() => {
+                          e.target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        }, 300);
+                      }}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter' && !e.shiftKey) {
                           e.preventDefault();
@@ -587,6 +735,44 @@ export default function Chat() {
           )}
         </div>
       </div>
+
+      {/* Edit Username Modal */}
+      {showEditUsername && (
+        <div className={styles.modal} onClick={() => setShowEditUsername(false)}>
+          <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
+            <h2 className={styles.modalTitle}>Edit Username</h2>
+            <input
+              type="text"
+              value={newUsername}
+              onChange={(e) => setNewUsername(e.target.value)}
+              placeholder="Enter new username"
+              className={styles.modalInput}
+              maxLength={30}
+              autoFocus
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  handleEditUsername();
+                }
+              }}
+            />
+            <div className={styles.modalButtons}>
+              <button
+                className={`${styles.modalButton} ${styles.modalButtonSecondary}`}
+                onClick={() => setShowEditUsername(false)}
+              >
+                Cancel
+              </button>
+              <button
+                className={`${styles.modalButton} ${styles.modalButtonPrimary}`}
+                onClick={handleEditUsername}
+                disabled={!newUsername.trim() || newUsername.trim().length < 2}
+              >
+                Update
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Create Thread Modal */}
       {showCreateThread && (
